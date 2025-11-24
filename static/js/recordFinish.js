@@ -305,7 +305,7 @@ function startCheckingSpeakerAnalysisResult() {
                     // segments를 transcripts 형식으로 변환
                     if (result.segments && Array.isArray(result.segments)) {
                         meetingData.transcripts = result.segments.map((seg, idx) => ({
-                            // [수정] speakerName과 speaker(ID)를 명확히 구분
+                            // speakerName과 speaker(ID)를 명확히 구분
                             speaker: seg.speaker?.name || `화자${seg.speaker?.label || 0}`, // 이것을 ID로 사용
                             speakerName: seg.speaker?.name || `화자${seg.speaker?.label || 0}`, // 이것을 이름으로 사용
                             speakerLabel: seg.speaker?.label,  // CLOVA label 보존
@@ -1014,7 +1014,7 @@ function displayAISummary() {
     let cleanSummary = rawSummary
         .replace(/^(요약|Summary)[:\s]*/i, "")  
         .split(/\(중요도 판정 사유:/)[0]       
-        .split(/중요도\s*평가/)[0] // [수정] 평가 텍스트 더 강력하게 제거          
+        .split(/중요도\s*평가/)[0] // 평가 텍스트 더 강력하게 제거          
         .trim();
 
     document.getElementById("summaryView").textContent = cleanSummary;
