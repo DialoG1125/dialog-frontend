@@ -1,13 +1,42 @@
-name: Deploy Frontend to EC2
+name: CI/CD Frontend to EC2
 
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main, develop]
 
 jobs:
-  deploy:
+  # CI: 빌드 검증
+  ci:
     runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Verify Required Files
+        run: |
+          test -f index.html || { echo "index.html not found"; exit 1; }
+          test -d static || { echo "static directory not found"; exit 1; }
+          test -f Dockerfile || { echo "Dockerfile not found"; exit 1; }
+      
+      - name: Check HTML Syntax
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tidy
+          find . -name "*.html" -exec tidy -q -e {} \; || true
+      
+      - name: Docker Build Test
+        run: |
+          docker build -t dialog-frontend-test .
 
+  # CD: 배포 (main 브랜치만)
+  cd:
+    needs: ci
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
     steps:
       - name: Checkout
         uses: actions/checkout@v4
