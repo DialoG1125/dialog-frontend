@@ -1,3 +1,9 @@
+const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+// [수정] HTTPS 적용 - Caddy가 프록시하므로 포트 번호 제거
+const BACKEND_BASE_URL = isLocal ? 'http://localhost:8080' : 'https://dialogai.duckdns.org';
+const AI_BASE_URL = isLocal ? 'http://localhost:8000' : 'https://dialogai.duckdns.org';
+
 function getTokenFromUrl() {
     const params = new URLSearchParams(window.location.search);
     return params.get('token');
@@ -67,7 +73,7 @@ resetPasswordForm.addEventListener('submit', async function(e) {
     }
 
     try {
-        const response = await fetch('http://dialogai.duckdns.org:8080/api/auth/resetPassword', {
+        const response = await fetch(`${BACKEND_BASE_URL}/api/auth/resetPassword`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ token, newPassword })

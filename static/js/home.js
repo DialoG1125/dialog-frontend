@@ -58,8 +58,8 @@ function activateCurrentNav(sidebar) {
 // =========================================
 //  2. 홈 데이터 초기화 및 API 설정
 // =========================================
-const CALENDAR_API_BASE = 'http://dialogai.duckdns.org:8080/api/calendar';
-const HOME_API_BASE = 'http://dialogai.duckdns.org:8080/api/home'; // [신규] 통계용 API
+const CALENDAR_API_BASE = `${BACKEND_BASE_URL}/api/calendar`;
+const HOME_API_BASE = `${BACKEND_BASE_URL}/api/home`; // [신규] 통계용 API
 const today = new Date();
 
 async function initHomeData() {
@@ -213,7 +213,8 @@ function loadRecentMeetings() {
             date: new Date(meeting.eventDate + 'T' + (meeting.time || '00:00:00')), 
             title: meeting.title,
             type: 'meeting',
-            eventDateStr: meeting.eventDate
+            eventDateStr: meeting.eventDate,
+            meetingId: meeting.sourceId
         }));
 
         renderRecentMeetings(processedEvents);
@@ -311,12 +312,9 @@ function renderImportantMeetings(events) {
                     </div>
                 </div>`;
         });
-    } else if (events.length > 0) {
-        // 데이터는 있으나 중요 회의가 없음
-        listEl.innerHTML = noMeetingsHtml;
     } else {
-        // 데이터 로드 실패 또는 데이터 0건 (연동 필요 상태로 가정)
-        listEl.innerHTML = emptyStateHtml;
+        // 중요 회의가 없음 (데이터가 있든 없든 같은 메시지)
+        listEl.innerHTML = noMeetingsHtml;
     }
 }
 
@@ -334,13 +332,17 @@ function renderRecentMeetings(events) {
     listEl.innerHTML = meetings.length ? '' : '<div class="empty-message" style="color: #9ca3af; text-align: center; padding: 24px 0;">최근 회의 기록이 없습니다</div>';
     
     meetings.forEach(m => {
+        const clickAction = m.meetingId 
+            ? `goToMeetingDetail('${m.meetingId}')` 
+            : `goToCalendarWithDate('${m.eventDateStr}')`;
+
         listEl.innerHTML += `
             <div class="meeting-item">
                 <div class="meeting-info">
                     <div class="meeting-title" 
-                         onclick="goToCalendarWithDate('${m.eventDateStr}')"
-                         style="cursor: pointer;"
-                         title="캘린더에서 이 날짜 보기">
+                        onclick="${clickAction}"
+                        style="cursor: pointer;"
+                        title="회의 상세 보기">
                         ${m.title}
                     </div>
                     <div class="meeting-meta">
@@ -355,6 +357,13 @@ function renderRecentMeetings(events) {
 // =========================================
 //  7. 액션 및 헬퍼 함수들
 // =========================================
+
+// 상세 페이지 이동
+function goToMeetingDetail(meetingId) {
+    if (meetingId) {
+        window.location.href = `meetingDetail.html?id=${meetingId}`;
+    }
+}
 
 // To-Do 완료 상태 업데이트
 async function updateTodoStatus(todoId, isCompleted) {   

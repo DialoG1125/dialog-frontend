@@ -53,52 +53,79 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
 
   // 사이드바 로드
-  fetch("components/sidebar.html")
-    .then(res => res.text())
-    .then(html => {
-      const sidebar = document.getElementById("sidebar-container");
-      sidebar.innerHTML = html;
+// 사이드바 로드
+fetch("components/sidebar.html")
+  .then(res => res.text())
+  .then(html => {
+    const sidebar = document.getElementById("sidebar-container");
+    sidebar.innerHTML = html;
 
-      const currentPage = window.location.pathname.split("/").pop();
-      const navItems = sidebar.querySelectorAll(".nav-menu a");
+    const currentPage = window.location.pathname.split("/").pop();
+    const navItems = sidebar.querySelectorAll(".nav-menu a");
 
-      navItems.forEach(item => {
-        const linkPath = item.getAttribute("href");
+    navItems.forEach(item => {
+      const linkPath = item.getAttribute("href");
+      
+      // 먼저 모든 active 제거
+      item.classList.remove("active");
+      
+      // recording.html, recordFinish.html은 recordSetting 메뉴를 active로 표시
+      if (currentPage === "recording.html" || currentPage === "recordFinish.html") {
+        if (linkPath === "recordSetting.html") {
+          item.classList.add("active");
+        }
+      } else {
+        // 다른 페이지들은 기존 로직 유지
         if (linkPath === currentPage) {
           item.classList.add("active");
-        } else {
-          item.classList.remove("active");
         }
-      });
-
-      if (typeof loadCurrentUser === 'function') {
-        console.log('recordFinish.js: app.js의 loadCurrentUser()를 호출합니다.');
-        loadCurrentUser();
-      } else {
-        console.error('recordFinish.js: app.js의 loadCurrentUser() 함수를 찾을 수 없습니다.');
-
-        document.querySelectorAll(".user-avatar").forEach(el => { el.textContent = "U"; });
-        document.querySelectorAll(".user-name").forEach(el => { el.textContent = "사용자"; });
-        document.querySelectorAll(".user-email").forEach(el => { el.textContent = ""; });
       }
     });
+
+    if (typeof loadCurrentUser === 'function') {
+      console.log('recordFinish.js: app.js의 loadCurrentUser()를 호출합니다.');
+      loadCurrentUser();
+    } else {
+      console.error('recordFinish.js: app.js의 loadCurrentUser() 함수를 찾을 수 없습니다.');
+
+      document.querySelectorAll(".user-avatar").forEach(el => { el.textContent = "U"; });
+      document.querySelectorAll(".user-name").forEach(el => { el.textContent = "사용자"; });
+      document.querySelectorAll(".user-email").forEach(el => { el.textContent = ""; });
+    }
+  });
 
   // 서버에서 회의 데이터 로드
   await loadMeetingDataFromServer();
   
-  // sessionStorage에서 발화자 분석 토큰 확인 (recordPage에서 전달된 경우)
-  const savedToken = sessionStorage.getItem("speakerAnalysisToken");
-  if (savedToken) {
-      console.log("🎤 저장된 발화자 분석 토큰 발견:", savedToken);
-      speakerAnalysisToken = savedToken;
-      sessionStorage.removeItem("speakerAnalysisToken");
-    //   startCheckingSpeakerAnalysisResult();
-  } 
+  // 🔥 이미 발화자 분석 결과가 있는지 확인
+  const hasExistingTranscripts = meetingData && 
+                                 meetingData.transcripts && 
+                                 meetingData.transcripts.length > 0;
   
-  // 발화자 분석 상태 체크 및 UI 업데이트
-  checkSpeakerAnalysisStatus();
-  checkMappingCompletion();
-  checkActionGenerationButtonState(); // '내 할 일 생성' 버튼 상태도 체크
+  if (hasExistingTranscripts) {
+    // 이미 분석 결과가 있으면 분석 시작하지 않음
+    console.log("✅ 기존 발화자 분석 결과가 존재합니다. 새로운 분석을 시작하지 않습니다.");
+    
+    // 기존 데이터로 UI 업데이트만 수행
+    checkMappingCompletion();
+    checkActionGenerationButtonState();
+  } else {
+    // 분석 결과가 없을 때만 발화자 분석 진행
+    console.log("🎤 발화자 분석 결과가 없습니다. 분석을 시작합니다.");
+    
+    // sessionStorage에서 발화자 분석 토큰 확인 (recordPage에서 전달된 경우)
+    const savedToken = sessionStorage.getItem("speakerAnalysisToken");
+    if (savedToken) {
+        console.log("🎤 저장된 발화자 분석 토큰 발견:", savedToken);
+        speakerAnalysisToken = savedToken;
+        sessionStorage.removeItem("speakerAnalysisToken");
+    } 
+    
+    // 발화자 분석 상태 체크 및 UI 업데이트
+    checkSpeakerAnalysisStatus();
+    checkMappingCompletion();
+    checkActionGenerationButtonState();
+  }
 });
 
 function openConfirmModal(title, message, onConfirm) {
@@ -172,40 +199,100 @@ function showErrorModal(title, message, onConfirm) {
 }
 
 /* 공통 메시지 */
-function showSuccessMessage(msg) {
-  const div = document.createElement("div");
-  div.className = "success-toast";
-  div.textContent = msg;
-  Object.assign(div.style, {
-      position: "fixed",
-      top: "24px",
-      right: "24px",
-      background: "#10b981",
-      color: "#fff",
-      padding: "12px 20px",
-      borderRadius: "8px",
-      zIndex: "9999",
-  });
-  document.body.appendChild(div);
-  setTimeout(() => div.remove(), 2500);
+function showSuccessMessage(message) {
+    const existing = document.querySelector('.success-message');
+    if (existing) existing.remove();
+
+    const msg = document.createElement('div');
+    msg.className = 'success-message';
+    msg.style.cssText = `
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%) translateY(-20px);
+        background: linear-gradient(135deg, #8E44AD 0%, #9b59b6 100%);
+        color: white;
+        padding: 10px 16px;
+        border-radius: 8px;
+        box-shadow: 0 2px 12px rgba(142, 68, 173, 0.3);
+        z-index: 10000;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        opacity: 0;
+        transition: all 0.4s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+        max-width: 400px;
+        font-weight: 500;
+        font-size: 14px;
+    `;
+    msg.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        <span>${message}</span>
+    `;
+    document.body.appendChild(msg);
+
+    // 등장 애니메이션
+    requestAnimationFrame(() => {
+        msg.style.opacity = '1';
+        msg.style.transform = 'translateX(-50%) translateY(0)';
+    });
+
+    setTimeout(() => {
+        msg.style.opacity = '0';
+        msg.style.transform = 'translateX(-50%) translateY(-20px)';
+        setTimeout(() => msg.remove(), 400);
+    }, 3000);
 }
 
-function showErrorMessage(msg) {
-  const div = document.createElement("div");
-  div.className = "error-toast";
-  div.textContent = msg;
-  Object.assign(div.style, {
-      position: "fixed",
-      top: "24px",
-      right: "24px",
-      background: "#ef4444",
-      color: "#fff",
-      padding: "12px 20px",
-      borderRadius: "8px",
-      zIndex: "9999",
-  });
-  document.body.appendChild(div);
-  setTimeout(() => div.remove(), 2500);
+function showErrorMessage(message) {
+    const existing = document.querySelector('.error-message');
+    if (existing) existing.remove();
+
+    const msg = document.createElement('div');
+    msg.className = 'error-message';
+    msg.style.cssText = `
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%) translateY(-20px);
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        color: white;
+        padding: 10px 16px;
+        border-radius: 20px;
+        box-shadow: 0 2px 12px rgba(239, 68, 68, 0.3);
+        z-index: 10000;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        opacity: 0;
+        transition: all 0.4s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+        max-width: 400px;
+        font-weight: 500;
+        font-size: 14px;
+    `;
+    msg.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <span>${message}</span>
+    `;
+    document.body.appendChild(msg);
+
+    // 등장 애니메이션
+    requestAnimationFrame(() => {
+        msg.style.opacity = '1';
+        msg.style.transform = 'translateX(-50%) translateY(0)';
+    });
+
+    setTimeout(() => {
+        msg.style.opacity = '0';
+        msg.style.transform = 'translateX(-50%) translateY(-20px)';
+        setTimeout(() => msg.remove(), 400);
+    }, 3000);
 }
 
 /* ===============================
@@ -215,9 +302,10 @@ async function startSpeakerAnalysis(audioUrl) {
   console.log("발화자 분석 시작 요청:", audioUrl);
 
   try {
-    const res = await fetch("/api/analyze/object", {
+    const res = await fetch(`${AI_BASE_URL}/api/analyze/object`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: 'include',
       body: JSON.stringify({
         file_url: audioUrl,
         language: "ko",
@@ -249,7 +337,8 @@ async function pollSpeakerResult(token, filename) {
   console.log("JSON polling 시작...");
 
   // filename 반드시 포함해야 Object Storage JSON 찾을 수 있음
-  const url = `/api/analyze/${token}?filename=${filename}`;
+  // const url = `http://localhost:8080/api/analyze/${token}?filename=${filename}`;
+  const url = `${AI_BASE_URL}/api/analyze/${token}?filename=${filename}`;
 
   let tryCount = 0;
 
@@ -415,12 +504,12 @@ async function loadMeetingDataFromServer() {
         console.log(`📥 회의 데이터 로드 시작 (ID: ${meetingId})`);
 
         // 1. 회의 기본 정보 로드 (동일)
-        const response = await fetch(`http://dialogai.duckdns.org:8080/api/meetings/${meetingId}`, { credentials: 'include' });
+        const response = await fetch(`${BACKEND_BASE_URL}/api/meetings/${meetingId}`, { credentials: 'include' });
         if (!response.ok) throw new Error('회의 정보를 불러올 수 없습니다.');
         const data = await response.json();
 
         // 2. 발화 로그(Transcript) 로드
-        const transcriptResponse = await fetch(`http://dialogai.duckdns.org:8080/api/transcripts/meeting/${meetingId}`, { credentials: 'include' });
+        const transcriptResponse = await fetch(`${BACKEND_BASE_URL}/api/transcripts/meeting/${meetingId}`, { credentials: 'include' });
         
         let loadedTranscripts = [];
         const restoredMapping = {}; 
@@ -496,7 +585,9 @@ async function loadMeetingDataFromServer() {
             // 서버 DTO 필드명이 isCompleted 인지, completed 인지 확인 필요
             // DTO에는 isCompleted로 되어 있으므로 아래 코드가 맞음.
             // 만약 안 나온다면 || false 처리 때문에 false로 덮어써지는지 확인.
-            isCompleted: item.isCompleted === true // 명시적으로 true일 때만 true
+            isCompleted: item.isCompleted === true, // 명시적으로 true일 때만 true
+            googleEventId: item.googleEventId,
+            addedToCalendar: !!item.googleEventId
         }));
 
         await loadRecording(meetingId);
@@ -513,7 +604,10 @@ async function loadMeetingDataFromServer() {
         // ======================================
         // 자동 발화자 분석 실행 지점
         // ======================================
-        if (
+        // 🔥 이미 transcript가 있으면 발화자 분석을 시작하지 않음
+        const hasTranscripts = loadedTranscripts && loadedTranscripts.length > 0;
+        
+        if (!hasTranscripts && 
             meetingData.audioFileUrl &&
             typeof meetingData.audioFileUrl === "string" &&
             meetingData.audioFileUrl.startsWith("https://") &&
@@ -521,7 +615,9 @@ async function loadMeetingDataFromServer() {
         ) {
             console.log("🎤 자동 발화자 분석 시작:", meetingData.audioFileUrl);
             startSpeakerAnalysis(meetingData.audioFileUrl);
-}
+        } else if (hasTranscripts) {
+            console.log("✅ 기존 발화 로그가 있어 발화자 분석을 건너뜁니다.");
+        }
         
         // 로컬 스토리지 백업
         localStorage.setItem("lastMeeting", JSON.stringify(meetingData));
@@ -534,9 +630,15 @@ async function loadMeetingDataFromServer() {
 /* Recording 데이터 로드 */
 async function loadRecording(meetingId) {
     try {
-        const response = await fetch(`http://dialogai.duckdns.org:8080/api/recordings/meeting/${meetingId}`, {
+        const response = await fetch(`${BACKEND_BASE_URL}/api/recordings/meeting/${meetingId}`, {
             credentials: 'include'
         });
+
+        // 404(녹음 없음)면 조용히 종료 (에러 로그 방지)
+        if (response.status === 404) {
+            console.log("녹음 파일이 없는 회의입니다.");
+            return;
+        }
 
         if (response.ok) {
             const recording = await response.json();
@@ -837,7 +939,7 @@ async function generateAISummary(userJob) {
         const meetingId = getMeetingId();
         if (!meetingId) throw new Error("Meeting ID를 찾을 수 없습니다.");
 
-        const response = await fetch(`http://dialogai.duckdns.org:8080/api/meetings/summarize?meetingId=${meetingId}`, {
+        const response = await fetch(`${BACKEND_BASE_URL}/api/meetings/summarize?meetingId=${meetingId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
@@ -1297,52 +1399,98 @@ function editAction(index) {
     document.getElementById("actionTitle").value = action.title;
     document.getElementById("actionDeadline").value = action.deadline || "";
     
+    // 담당자 Select 박스 구성
     const assigneeSelect = document.getElementById("actionAssignee");
     assigneeSelect.innerHTML = '<option value="">담당자 선택</option>';
     (meetingData.participants || []).forEach(p => {
         const selected = (p === action.assignee) ? 'selected' : '';
         assigneeSelect.innerHTML += `<option value="${p}" ${selected}>${p}</option>`;
     });
-
     const assigneeField = document.querySelector('.form-group:has(#actionAssignee)');
     if (assigneeField) assigneeField.style.display = 'block';
-    
+
     const modal = document.getElementById("actionModal");
     modal.classList.remove("hidden");
     document.body.style.overflow = "hidden";
     
     const saveBtn = modal.querySelector(".btn-primary");
     saveBtn.textContent = "수정";
-    saveBtn.onclick = () => {
-        const title = document.getElementById("actionTitle").value.trim();
-        if (!title) {
+    
+    // 저장(수정) 버튼 클릭 핸들러
+    saveBtn.onclick = async () => {
+        const newTitle = document.getElementById("actionTitle").value.trim();
+        const newDeadline = document.getElementById("actionDeadline").value;
+        const newAssignee = document.getElementById("actionAssignee").value;
+
+        if (!newTitle) {
             showErrorMessage("액션 아이템을 입력해주세요.");
             return;
         }
-        const deadline = document.getElementById("actionDeadline").value;
-        const assignee = document.getElementById("actionAssignee").value;
-        
-        actionItems[index] = { 
-            title, 
-            assignee: assignee || "", 
-            deadline,
-            addedToCalendar: action.addedToCalendar, 
-            source: action.source || 'USER',
-            isCompleted: action.isCompleted || false
-        };
-        
-        renderActionItems();
-        closeActionModal();
-        showSuccessMessage("액션 아이템이 수정되었습니다.");
-        
-        saveBtn.textContent = "추가";
-        saveBtn.onclick = saveAction;
+
+        // 로딩 표시 (선택 사항)
+        saveBtn.disabled = true;
+        saveBtn.textContent = "처리 중...";
+
+        try {
+            // 1. 캘린더에 연동된 항목이라면 -> 백엔드 API 먼저 호출
+            if (action.addedToCalendar && action.googleEventId) {
+                const bodyData = {
+                    calendarId: "primary",
+                    eventData: {
+                        summary: newTitle,
+                        start: { date: newDeadline },
+                        end: { date: newDeadline }
+                    }
+                };
+
+                const response = await fetch(`${BACKEND_BASE_URL}/api/calendar/events`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify(bodyData)
+                });
+
+                if (!response.ok) {
+                    throw new Error("캘린더 서버 동기화 실패"); 
+                    // 여기서 에러가 발생하면 catch로 점프 -> 아래 로컬 수정 코드는 실행 안 됨
+                }
+                console.log("DB 및 캘린더 업데이트 성공");
+            }
+
+            // 2. API 성공 시에만 로컬 데이터 업데이트
+            actionItems[index] = { 
+                ...action, 
+                title: newTitle, 
+                assignee: newAssignee || "", 
+                deadline: newDeadline
+            };
+            
+            renderActionItems();
+            closeActionModal();
+            showSuccessMessage("액션 아이템이 수정되었습니다.");
+
+            // 캘린더 연동 여부와 관계없이 내용이 바뀌었으므로 DB 저장
+            await saveMeetingInBackground();
+            
+            // 버튼 상태 원복 (다음 추가를 위해)
+            saveBtn.textContent = "추가";
+            saveBtn.onclick = saveAction;
+
+        } catch (error) {
+            console.error("수정 실패", error);
+            showErrorMessage("수정에 실패했습니다.");
+            // 실패했으므로 모달을 닫지 않고, 버튼만 다시 활성화해줍니다.
+            saveBtn.textContent = "수정";
+        } finally {
+            saveBtn.disabled = false;
+        }
     };
 }
 
 async function toggleCalendar(index) {      
-  const item = actionItems[index];
+    const item = actionItems[index];
     if (!item) return;   
+
     const isAdding = !item.addedToCalendar;
 
     if (isAdding) {       
@@ -1350,55 +1498,88 @@ async function toggleCalendar(index) {
             showErrorMessage("캘린더에 추가하려면 '기한'이 설정되어야 합니다.");
             return;
         }
+
         const bodyData = {
             calendarId: "primary", 
             eventData: {
                 summary: item.title, 
+                description: `담당자: ${item.assignee || '미지정'}`, 
                 start: { date: item.deadline },
                 end: { date: item.deadline }
             }
         };
+
         try {
-            const response = await fetch('http://dialogai.duckdns.org:8080/api/calendar/events', {
+            showLoadingMessage("캘린더에 등록 중...");
+            const response = await fetch(`${BACKEND_BASE_URL}/api/calendar/events`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
                 body: JSON.stringify(bodyData)
             });
-            if (!response.ok) throw new Error('캘린더 이벤트 생성에 실패했습니다.');
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(errorText || '생성 실패');
+            }
 
             const newEvent = await response.json();
-            item.googleEventId = newEvent.googleEventId; 
+            
+            // 상태 업데이트
+            item.googleEventId = newEvent.id || newEvent.googleEventId; 
             item.addedToCalendar = true; 
+            
+            hideLoadingMessage();
             showSuccessMessage("캘린더에 추가되었습니다.");
+
+            // 즉시 DB 저장 (Google ID 동기화)
+            await saveMeetingInBackground();
+
         } catch (error) {
+            hideLoadingMessage();
             console.error("캘린더 추가 실패:", error);
-            showErrorMessage(error.message || "캘린더 추가에 실패했습니다.");
+            showErrorMessage("추가 실패: " + error.message);
+            // 실패했으므로 item.addedToCalendar는 false 상태 유지됨
         }
+
     } else {
+        // === [삭제 로직] ===
         const eventId = item.googleEventId;
         if (!eventId) {
-            showErrorMessage("캘린더에서 제거할 수 없습니다. (이벤트 ID 없음)");
-            item.addedToCalendar = false;
-            renderActionItems();
+            showErrorMessage("이벤트 ID가 없어 삭제할 수 없습니다.");
             return;
         }
+
         try {
-            const response = await fetch(`http://dialogai.duckdns.org:8080/api/calendar/events/${eventId}`, {
+            showLoadingMessage("캘린더에서 삭제 중...");
+            const response = await fetch(`${BACKEND_BASE_URL}/api/calendar/events/${eventId}`, {
                 method: 'DELETE',
                 credentials: 'include'
             });
-            if (!response.ok) throw new Error('캘린더 이벤트 삭제에 실패했습니다.');
 
+            if (!response.ok && response.status !== 404) {
+                throw new Error('삭제 실패');
+            }
+
+            // 상태 업데이트
             item.googleEventId = null; 
             item.addedToCalendar = false; 
+            
+            hideLoadingMessage();
             showErrorMessage("캘린더에서 제거되었습니다.");
+
+            // 즉시 DB 저장 (연동 해제 상태 동기화)
+            await saveMeetingInBackground();
+
         } catch (error) {
+            hideLoadingMessage();
             console.error("캘린더 삭제 실패:", error);
-            showErrorMessage(error.message || "캘린더 삭제에 실패했습니다.");
+            showErrorMessage("삭제 실패: " + error.message);
+            // 실패했으므로 item.addedToCalendar는 true 상태 유지됨
         }
     }
-    renderActionItems();
+    
+    renderActionItems(); // UI 갱신
 }
 
 function openActionModal() {
@@ -1454,10 +1635,37 @@ function closeActionModal() {
 }
 
 function deleteAction(index) {
-  openConfirmModal("액션 아이템 삭제", "이 액션 아이템을 삭제하시겠습니까?", () => {
-      actionItems.splice(index, 1);
-      renderActionItems();
-      showErrorMessage("액션 아이템이 삭제되었습니다.");
+  openConfirmModal("액션 아이템 삭제", "이 액션 아이템을 삭제하시겠습니까?", async () => {
+      const item = actionItems[index];
+
+      try {
+          // 1. 캘린더에 추가된 항목이면 서버 삭제 시도
+          if (item.addedToCalendar && item.googleEventId) {
+              const response = await fetch(`${BACKEND_BASE_URL}/api/calendar/events/${item.googleEventId}`, {
+                  method: 'DELETE',
+                  credentials: 'include'
+              });
+              
+              if (!response.ok && response.status !== 404) {
+                  // 404(이미 없음)가 아닌 다른 에러라면 실패 처리
+                  throw new Error("서버 삭제 실패");
+              }
+              console.log("DB 및 캘린더 삭제 성공");
+          }
+
+          // 2. 서버 삭제 성공(또는 연동 안 된 항목) 시 로컬 삭제
+          actionItems.splice(index, 1);
+          renderActionItems();
+          showErrorMessage("액션 아이템이 삭제되었습니다."); // 빨간 토스트 (삭제 알림)
+
+          // 항목이 삭제되었으므로 DB 즉시 저장
+          await saveMeetingInBackground();
+
+      } catch (error) {
+          console.error("삭제 실패:", error);
+          showErrorMessage("삭제에 실패했습니다. (서버 동기화 오류)");
+          // 로컬 데이터는 유지됨
+      }
   });
 }
 
@@ -1725,7 +1933,8 @@ function collectFinalData() {
       assignee: a.assignee || "미지정",
       deadline: a.deadline || "-",
       isCompleted: a.isCompleted,
-      source: a.source ? a.source.toUpperCase() : "USER"
+      source: a.source ? a.source.toUpperCase() : "USER",
+      googleEventId: a.googleEventId || null 
   }));
 
   // 4. 중요도 데이터 처리
@@ -2017,32 +2226,45 @@ async function exportPDF() {
 
 // 서버 전송 데이터 수집 (ID/이름 구분 및 참석자 포함)
 function collectUpdateData() {
-    // 1. 중요도 데이터 처리
-    let importanceData = { level: "MEDIUM", reason: "" };
+    // 1. 중요도 데이터 처리 (사유 없으면 null 처리)
+    let importanceData = null; // 기본값 null (분석 전)
+
     if (meetingData.importance) {
+        let level = "MEDIUM";
+        let reason = "";
+
         if (typeof meetingData.importance === 'object') {
-            importanceData.level = meetingData.importance.level || "MEDIUM";
-            importanceData.reason = meetingData.importance.reason || "";
+            level = meetingData.importance.level || "MEDIUM";
+            reason = meetingData.importance.reason || "";
         } else {
-            importanceData.level = meetingData.importance; 
+            level = meetingData.importance;
+        }
+
+        // 사유가 있고 유효한 경우에만 객체 생성, 아니면 null 유지
+        if (reason && reason.trim() !== "" && reason !== "평가 내용 없음") {
+            importanceData = {
+                level: level,
+                reason: reason
+            };
         }
     }
 
-    // 2. 키워드 리스트 처리 (기존 동일)
+    // 2. 키워드 리스트 처리
     const keywordList = (meetingData.keywords || []).map(k => ({
         text: k.text, source: k.source ? k.source.toUpperCase() : "USER"
     }));
 
-    // 3. 액션 아이템 리스트 처리 (기존 동일)
+    // 3. 액션 아이템 리스트 처리
     const actionItemList = (actionItems || []).map(item => ({
         task: item.title, 
         assignee: item.assignee, 
         dueDate: item.deadline,
         source: item.source ? item.source.toUpperCase() : "USER",
-        isCompleted: item.isCompleted || false 
+        isCompleted: item.isCompleted || false,
+        googleEventId: item.googleEventId || null
     }));
 
-    // 4. 참석자 명단 처리 (기존 동일)
+    // 4. 참석자 명단 처리
     const participantList = (meetingData.participants || []).map(name => {
         let originalId = Object.keys(speakerMappingData).find(key => speakerMappingData[key] === name);
         if (!originalId) {
@@ -2055,15 +2277,12 @@ function collectUpdateData() {
     });
 
     // 5. 발화 로그(Transcript) 처리
-    // 먼저 시간순으로 정렬을 확실하게 합니다.
     const sortedTranscripts = (meetingData.transcripts || []).sort((a, b) => a.startTime - b.startTime);
-
     const transcriptList = sortedTranscripts.map((t, index) => {
         let realSpeakerId = t.speaker; 
         if (!realSpeakerId) {
             realSpeakerId = t.speakerName || "Unknown";
         }
-
         return {
             id: t.id, 
             speaker: realSpeakerId,
@@ -2071,16 +2290,12 @@ function collectUpdateData() {
             text: t.text || "",
             startTime: t.startTime || 0,
             endTime: t.endTime || 0,
-            
-            // 현재 정렬된 순서(index)대로 번호를 다시 매깁니다. (0, 1, 2, 3...)
-            // 이렇게 하면 중간에 삭제하거나 추가해도 DB에는 깔끔한 순서로 저장됩니다.
             sequenceOrder: index, 
-            
             isDeleted: t.isDeleted || false 
         };
     });
 
-    // 6. 최종 리턴 (기존 동일)
+    // 6. 최종 리턴
     return {
         title: meetingData.title,
         purpose: meetingData.purpose,
@@ -2092,6 +2307,56 @@ function collectUpdateData() {
         participants: participantList, 
         transcripts: transcriptList
     };
+}
+
+/* =========================================================
+   액션 아이템만 부분 저장하는 로직
+   ========================================================= */
+
+// 1. 액션 아이템만 뽑아내는 함수
+function collectActionItemsOnly() {
+    const actionItemList = (actionItems || []).map(item => ({
+        task: item.title, 
+        assignee: item.assignee, 
+        dueDate: item.deadline,
+        source: item.source ? item.source.toUpperCase() : "USER",
+        isCompleted: item.isCompleted || false,
+        googleEventId: item.googleEventId || null
+    }));
+
+    // 다른 필드(transcripts, summary 등)는 아예 보내지 않음 -> 백엔드가 무시함
+    return {
+        actionItems: actionItemList
+    };
+}
+
+// 2. 백그라운드 저장 함수 (액션 아이템 전용)
+async function saveMeetingInBackground() {
+    if (!meetingData) return;
+    const meetingId = getMeetingId();
+    if (!meetingId) return;
+
+    // 전체 데이터가 아니라 '액션 아이템'만 가져옴
+    const partialDto = collectActionItemsOnly(); 
+    
+    console.log("액션 아이템만 DB 저장 중...", partialDto);
+
+    try {
+        const response = await fetch(`${BACKEND_BASE_URL}/api/meetings/${meetingId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(partialDto)
+        });
+
+        if (!response.ok) {
+            console.warn("자동 저장 실패", await response.text());
+        } else {
+            console.log("DB 동기화 완료");
+        }
+    } catch (error) {
+        console.error("네트워크 오류", error);
+    }
 }
 
 async function saveMeeting() {
@@ -2106,11 +2371,11 @@ async function saveMeeting() {
     }
 
     const updateDto = collectUpdateData();
-    console.log("📤 서버로 전송할 데이터:", updateDto);
+    console.log("서버로 전송할 데이터:", updateDto);
     showLoadingMessage("회의록을 서버에 저장 중...");
 
     try {
-        const response = await fetch(`http://dialogai.duckdns.org:8080/api/meetings/${meetingId}`, {
+        const response = await fetch(`${BACKEND_BASE_URL}/api/meetings/${meetingId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
@@ -2120,15 +2385,16 @@ async function saveMeeting() {
         if (!response.ok) throw new Error(await response.text());
 
         hideLoadingMessage();
-        showSuccessMessage("회의록이 서버에 저장되었습니다.");
+        showSuccessMessage("회의록이 저장되었습니다. 상세 페이지로 이동합니다.");
         
-        if (meetingData) {
-            meetingData.actions = actionItems;
-            localStorage.setItem("lastMeeting", JSON.stringify(meetingData));
-        }
+        // 저장 후 상세 페이지로 이동
+        setTimeout(() => {
+            window.location.href = `meetingDetail.html?id=${meetingId}`;
+        }, 1500); 
+
     } catch (error) {
         hideLoadingMessage();
-        console.error("서버 저장 실패:", error);
+        console.error("서버 저장 실패", error);
         showErrorMessage(`서버 저장 실패: ${error.message}`);
     }
 }
@@ -2263,7 +2529,7 @@ async function generateMyActions() {
     }
 
     try {
-        const response = await fetch(`http://dialogai.duckdns.org:8080/api/meetings/generate-all-actions?meetingId=${meetingId}`, {
+        const response = await fetch(`${BACKEND_BASE_URL}/api/meetings/generate-all-actions?meetingId=${meetingId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
@@ -2515,7 +2781,7 @@ async function saveMeetingDataToServer() {
         console.log(`📤 전송할 Transcript 수: ${transcriptDtos.length}개`);
 
         const response = await fetch(
-            `http://dialogai.duckdns.org:8080/api/transcripts/batch?meetingId=${meetingId}`,
+            `${BACKEND_BASE_URL}/api/transcripts/batch?meetingId=${meetingId}`,
             {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
