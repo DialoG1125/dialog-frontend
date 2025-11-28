@@ -1,3 +1,7 @@
+const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const BACKEND_BASE_URL = isLocal ? 'http://localhost:8080' : 'http://dialogai.duckdns.org:8080';
+const AI_BASE_URL = isLocal ? 'http://localhost:8000' : 'http://dialogai.duckdns.org:8000';
+
 /* ===============================
    meetingDetail.js - 최종 수정 (삭제 성공 모달 적용)
 =================================*/
@@ -96,9 +100,9 @@ function showErrorModal(msg) {
 async function loadMeetingDetail(meetingId) {
     try {
         const [metaRes, transRes, recRes] = await Promise.all([
-            fetch(`http://dialogai.duckdns.org:8080/api/meetings/${meetingId}`, { credentials: 'include' }),
-            fetch(`http://dialogai.duckdns.org:8080/api/transcripts/meeting/${meetingId}`, { credentials: 'include' }),
-            fetch(`http://dialogai.duckdns.org:8080/api/recordings/meeting/${meetingId}`, { credentials: 'include' })
+            fetch(`${BACKEND_BASE_URL}/api/meetings/${meetingId}`, { credentials: 'include' }),
+            fetch(`${BACKEND_BASE_URL}/api/transcripts/meeting/${meetingId}`, { credentials: 'include' }),
+            fetch(`${BACKEND_BASE_URL}/api/recordings/meeting/${meetingId}`, { credentials: 'include' })
         ]);
 
         // 1. 기본 정보(metaRes)는 필수이므로 실패 시 에러 처리
@@ -707,7 +711,7 @@ async function confirmDeleteProcess() {
     if (!meetingData || !meetingData.id) return;
 
     try {
-        const response = await fetch(`http://dialogai.duckdns.org:8080/api/meetings/${meetingData.id}`, {
+        const response = await fetch(`${BACKEND_BASE_URL}/api/meetings/${meetingData.id}`, {
             method: 'DELETE',
             credentials: 'include'
         });

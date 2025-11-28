@@ -1,3 +1,7 @@
+const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const BACKEND_BASE_URL = isLocal ? 'http://localhost:8080' : 'http://dialogai.duckdns.org:8080';
+const AI_BASE_URL = isLocal ? 'http://localhost:8000' : 'http://dialogai.duckdns.org:8000';
+
 /* ===============================
    [통합] 홈 화면 전용 JS (home.js)
 ================================= */
@@ -58,8 +62,8 @@ function activateCurrentNav(sidebar) {
 // =========================================
 //  2. 홈 데이터 초기화 및 API 설정
 // =========================================
-const CALENDAR_API_BASE = 'http://dialogai.duckdns.org:8080/api/calendar';
-const HOME_API_BASE = 'http://dialogai.duckdns.org:8080/api/home'; // [신규] 통계용 API
+const CALENDAR_API_BASE = `${BACKEND_BASE_URL}/api/calendar`;
+const HOME_API_BASE = `${BACKEND_BASE_URL}/api/home`; // [신규] 통계용 API
 const today = new Date();
 
 async function initHomeData() {
